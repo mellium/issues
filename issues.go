@@ -251,17 +251,32 @@ func main() {
 
 		debug.Printf("Attempting to create issue %d\n", issue.ID)
 		req := github.IssueRequest{
-			Title:  github.String(issue.Title),
-			Body:   github.String(issue.Content),
-			Labels: &labels,
-			State:  github.String(state),
+			Title: github.String(issue.Title),
+			Body:  github.String(issue.Content),
+			// TODO: labels are currently broken, I think I need to make sure they are
+			// created first.
+			// Labels: &labels,
+			State: github.String(state),
 		}
-		_, resp, err := client.Issues.Create(context.TODO(), owner, repo, &req)
+		is, resp, err := client.Issues.Create(context.TODO(), owner, repo, &req)
 		if err != nil {
 			errors++
 			logger.Printf("Error creating issue %d: `%v'", issue.ID, err)
 		} else {
 			imported++
+		}
+
+		if err == nil && state == "closed" && is.Number != nil {
+			logger.Printf("Closing issue %d…\n", issue.ID)
+			_, _, err := client.Issues.Edit(context.TODO(), owner, repo, *is.Number, &github.IssueRequest{
+				State: github.String(state),
+			})
+			if err != nil {
+				errors++
+				logger.Printf("Error closing issue %d: `%v'\n", issue.ID, err)
+			} else {
+				imported++
+			}
 		}
 
 		// GitHub asks that you wait at least one second between requests:
