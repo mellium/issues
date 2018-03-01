@@ -87,6 +87,10 @@ func usage(flags *flag.FlagSet, token string) {
 
 	issues [options] zip repo
 
+The zip file is a Bitbucket issue export which can be obtained by visiting your
+repo's settings on Bitbucket and choosing "Import & export" from the "issues"
+section.
+
 Environment:	
 
 	GITHUB_TOKEN=%s
