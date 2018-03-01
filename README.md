@@ -5,8 +5,7 @@
 
 [![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png)](https://www.buymeacoffee.com/samwhited)
 
-The `issues` tool extracts a Bitbucket issue export and attempts to import it
-into GitHub.
+The `issues` tool migrates issues from Bitbucket to GitHub.
 
 Right now it does not preserve issue IDs properly, is not idempotent, and does
 not import comments; hopefully these shortcomings will be fixed soon.

@@ -2,8 +2,7 @@
 // Use of this source code is governed by the BSD 2-clause
 // license that can be found in the LICENSE file.
 
-// The issues command can be used to import a Bitbucket issue tracker export to
-// a GitHub project.
+// The issues command migrates issues from Bitbucket to GitHub.
 //
 // For more information try:
 //
