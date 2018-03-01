@@ -1,0 +1,6 @@
+.env
+.signature
+issues
+vendor/
+*.zip
+*.json
