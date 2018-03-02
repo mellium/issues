@@ -232,7 +232,10 @@ func main() {
 		waittime := time.Second
 		retry := resp.Header.Get("Retry-After")
 		n, err := strconv.Atoi(retry)
-		if err == nil && n > 1 {
+		switch {
+		case err != nil:
+			debug.Printf("Error parsing Retry-After value `%s': `%v'\n", waittime, err)
+		case err == nil && n > 1:
 			waittime = time.Duration(n) * time.Second
 			debug.Printf("Waiting %s between requests…\n", waittime)
 		}
