@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -171,6 +172,7 @@ func main() {
 		imported = 0
 		errors   = 0
 	)
+	sort.Sort(issues.Issues)
 	for _, issue := range issues.Issues {
 		labels := strings.Split(labels, ",")
 		if issue.Priority != "" {
