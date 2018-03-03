@@ -236,7 +236,7 @@ func main() {
 		wait(resp, debug)
 
 		if err == nil && state == "closed" && is.Number != nil {
-			logger.Printf("Closing issue %d…\n", issue.ID)
+			debug.Printf("Closing issue %d…\n", issue.ID)
 			_, resp, err = client.Issues.Edit(context.TODO(), owner, repo, *is.Number, &github.IssueRequest{
 				State: github.String(state),
 			})
