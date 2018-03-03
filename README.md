@@ -7,9 +7,8 @@
 
 The `issues` tool migrates issues from Bitbucket to GitHub.
 
-Right now it does not preserve issue IDs if you have created any issues on your
-GitHub repo in the past, is not idempotent, and does not import comments or
-labels; hopefully these shortcomings will be fixed soon.
+Right now this tool does not import comments or labels; hopefully these
+shortcomings will be fixed soon.
 
 To install and run, make sure `GOBIN` (`~/go/bin` by default) is in your `PATH`,
 and then try:

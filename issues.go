@@ -146,33 +146,28 @@ func main() {
 	tc := oauth2.NewClient(context.TODO(), ts)
 	client := github.NewClient(tc)
 
-	// TODO: If issues already exist, prompt before attempting to create new ones.
-
-	// 		Title            string        `json:"title"`
-	// 		Content          string        `json:"content"`
-	// 		Priority         string        `json:"priority"`
-	// 		Kind             string        `json:"kind"`
-
-	// 		Status           string        `json:"status"`
-	// 		ContentUpdatedOn time.Time     `json:"content_updated_on"`
-	// 		Voters           []interface{} `json:"voters"`
-	// 		Reporter         string        `json:"reporter"`
-	// 		Component        *string       `json:"component"`
-	// 		Watchers         []string      `json:"watchers"`
-	// 		Assignee         interface{}   `json:"assignee"`
-	// 		CreatedOn        time.Time     `json:"created_on"`
-	// 		Version          interface{}   `json:"version"`
-	// 		EditedOn         interface{}   `json:"edited_on"`
-	// 		Milestone        interface{}   `json:"milestone"`
-	// 		UpdatedOn        time.Time     `json:"updated_on"`
-	// 		ID               int           `json:"id"`
-
 	// Create the issues.
 	var (
 		imported = 0
 		errors   = 0
 	)
 	sort.Sort(issues.Issues)
+
+	ghissues, resp, err := client.Issues.ListByRepo(context.TODO(), owner, repo, &github.IssueListByRepoOptions{
+		State: "all",
+	})
+	if err != nil {
+		logger.Fatalf("Error enumerating existing issues on repo: `%s'\n", err)
+	}
+	n := len(ghissues)
+	debug.Printf("Skipping %d existing issues\n", n)
+	if len(issues.Issues) <= n {
+		issues.Issues = issues.Issues[len(issues.Issues):]
+	} else {
+		issues.Issues = issues.Issues[n:]
+	}
+	wait(resp, debug)
+
 	for _, issue := range issues.Issues {
 		labels := strings.Split(labels, ",")
 		if issue.Priority != "" {
