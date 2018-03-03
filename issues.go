@@ -202,7 +202,11 @@ func main() {
 		debug.Printf("Attempting to create issue %d\n", issue.ID)
 		req := github.IssueRequest{
 			Title: github.String(issue.Title),
-			Body:  github.String(issue.Content),
+			Body: github.String(fmt.Sprintf(`by **%s**:
+
+---
+
+%s`, issue.Reporter, issue.Content)),
 			// TODO: labels are currently broken, I think I need to make sure they are
 			// created first.
 			// Labels: &labels,
