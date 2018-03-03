@@ -215,10 +215,11 @@ func main() {
 		} else {
 			imported++
 		}
+		wait(resp, debug)
 
 		if err == nil && state == "closed" && is.Number != nil {
 			logger.Printf("Closing issue %d…\n", issue.ID)
-			_, _, err := client.Issues.Edit(context.TODO(), owner, repo, *is.Number, &github.IssueRequest{
+			_, resp, err = client.Issues.Edit(context.TODO(), owner, repo, *is.Number, &github.IssueRequest{
 				State: github.String(state),
 			})
 			if err != nil {
@@ -227,33 +228,39 @@ func main() {
 			} else {
 				imported++
 			}
+			wait(resp, debug)
 		}
+	}
 
-		// GitHub asks that you wait at least one second between requests:
-		// https://developer.github.com/v3/guides/best-practices-for-integrators/#dealing-with-abuse-rate-limits
-		retry := resp.Header.Get("Retry-After")
-		var waittime time.Duration
-		if retry == "" {
-			// Default to 1 second if the Retry-After header was not set.
-			waittime = time.Second
+	s, _, _ := client.Octocat(context.TODO(), fmt.Sprintf("Imported %d, Errors %d", imported, errors))
+	fmt.Fprintln(os.Stderr, s)
+}
+
+// wait attempts to parse the Retry-After header and then sleeps the correct
+// amount of time.
+// If no Retry-After header exists, it defaults to sleeping 1 second.
+func wait(resp *github.Response, debug *log.Logger) {
+	// GitHub asks that you wait at least one second between requests:
+	// https://developer.github.com/v3/guides/best-practices-for-integrators/#dealing-with-abuse-rate-limits
+	retry := resp.Header.Get("Retry-After")
+	var waittime time.Duration
+	if retry == "" {
+		// Default to 1 second if the Retry-After header was not set.
+		waittime = time.Second
+	} else {
+		// GitHub's documentation shows numbers with no unit, but it appears to
+		// actually be using a unit. Support both, just in case.
+		n, err := strconv.Atoi(retry)
+		if err == nil {
+			waittime = time.Duration(n) * time.Second
 		} else {
-			// GitHub's documentation shows numbers with no unit, but it appears to
-			// actually be using a unit. Support both, just in case.
-			n, err := strconv.Atoi(retry)
-			if err == nil {
-				waittime = time.Duration(n) * time.Second
-				break
-			}
 			waittime, err = time.ParseDuration(retry)
 			if err != nil {
 				debug.Printf("Error parsing Retry-After value `%s': `%v'\n", waittime, err)
 				waittime = time.Second
 			}
 		}
-		debug.Printf("Waiting %s between requests…\n", waittime)
-		time.Sleep(waittime)
 	}
-
-	s, _, _ := client.Octocat(context.TODO(), fmt.Sprintf("Imported %d, Errors %d", imported, errors))
-	fmt.Fprintln(os.Stderr, s)
+	debug.Printf("Waiting %s between requests…\n", waittime)
+	time.Sleep(waittime)
 }
