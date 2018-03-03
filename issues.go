@@ -19,7 +19,6 @@ import (
 	"log"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -231,14 +230,13 @@ func main() {
 
 		// GitHub asks that you wait at least one second between requests:
 		// https://developer.github.com/v3/guides/best-practices-for-integrators/#dealing-with-abuse-rate-limits
-		waittime := time.Second
 		retry := resp.Header.Get("Retry-After")
-		n, err := strconv.Atoi(retry)
+		waittime, err := time.ParseDuration(retry)
 		switch {
 		case err != nil:
 			debug.Printf("Error parsing Retry-After value `%s': `%v'\n", waittime, err)
-		case err == nil && n > 1:
-			waittime = time.Duration(n) * time.Second
+			waittime = time.Second
+		case err == nil:
 			debug.Printf("Waiting %s between requests…\n", waittime)
 		}
 		time.Sleep(waittime)
