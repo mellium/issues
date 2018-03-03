@@ -59,12 +59,14 @@ func main() {
 		h      = false
 		v      = false
 		token  = os.Getenv("GITHUB_TOKEN")
+		tmpl   = ""
 		labels = ""
 	)
 	flags := flag.NewFlagSet("issues", flag.ContinueOnError)
 	flags.BoolVar(&help, "help", help, "print this help message")
 	flags.BoolVar(&h, "h", h, "print this help message")
 	flags.BoolVar(&v, "v", v, "enable verbose debug logging")
+	flags.StringVar(&tmpl, "f", tmpl, "a template to use for the contents of new issues")
 	flags.StringVar(&labels, "labels", labels, "list of comma separated labels to apply to all imported issues")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		logger.Fatalf("Error while parsing flags: `%v'", err)
@@ -88,6 +90,25 @@ func main() {
 	if v {
 		debug.SetOutput(os.Stderr)
 	}
+
+	if tmpl == "" {
+		tmpl = `
+|  Metadata  | Value  |
+| ---------- | ------ |
+{{if .Reporter}}| Reporter   | **{{ .Reporter }}** |
+{{end -}}
+{{if .CreatedOn}}| Created On | **{{ .CreatedOn }}** |
+{{end -}}
+{{if .EditedOn}} | Edited On  | **{{ .EditedOn }}** |
+{{end -}}
+{{if .UpdatedOn}}| Updated On | **{{ .UpdatedOn }}** |
+{{end -}}
+
+---
+
+{{if .Content}}{{.Content}}{{end}}`
+	}
+	issueTmpl := template.Must(template.New("issue").Parse(tmpl))
 
 	// Split the repo name into owner and repo
 	args := flags.Args()
@@ -169,22 +190,6 @@ func main() {
 		issues.Issues = issues.Issues[n:]
 	}
 	wait(resp, debug)
-
-	issueTmpl := template.Must(template.New("issue").Parse(`
-|  Metadata  | Value  |
-| ---------- | ------ |
-{{if .Reporter}}| Reporter   | **{{ .Reporter }}** |
-{{end -}}
-{{if .CreatedOn}}| Created On | **{{ .CreatedOn }}** |
-{{end -}}
-{{if .EditedOn}} | Edited On  | **{{ .EditedOn }}** |
-{{end -}}
-{{if .UpdatedOn}}| Updated On | **{{ .UpdatedOn }}** |
-{{end -}}
-
----
-
-{{if .Content}}{{.Content}}{{end}}`))
 
 	for _, issue := range issues.Issues {
 		labels := strings.Split(labels, ",")
