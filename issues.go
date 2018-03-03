@@ -11,6 +11,7 @@ package main // import "mellium.im/issues"
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -21,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/google/go-github/github"
@@ -168,6 +170,22 @@ func main() {
 	}
 	wait(resp, debug)
 
+	issueTmpl := template.Must(template.New("issue").Parse(`
+|  Metadata  | Value  |
+| ---------- | ------ |
+{{if .Reporter}}| Reporter   | **{{ .Reporter }}** |
+{{end -}}
+{{if .CreatedOn}}| Created On | **{{ .CreatedOn }}** |
+{{end -}}
+{{if .EditedOn}} | Edited On  | **{{ .EditedOn }}** |
+{{end -}}
+{{if .UpdatedOn}}| Updated On | **{{ .UpdatedOn }}** |
+{{end -}}
+
+---
+
+{{if .Content}}{{.Content}}{{end}}`))
+
 	for _, issue := range issues.Issues {
 		labels := strings.Split(labels, ",")
 		if issue.Priority != "" {
@@ -195,13 +213,14 @@ func main() {
 		}
 
 		debug.Printf("Attempting to create issue %d\n", issue.ID)
+		buf := new(bytes.Buffer)
+		err = issueTmpl.Execute(buf, issue)
+		if err != nil {
+			logger.Printf("Error executing issue template on issue %d: `%v'", issue.ID, err)
+		}
 		req := github.IssueRequest{
 			Title: github.String(issue.Title),
-			Body: github.String(fmt.Sprintf(`by **%s**:
-
----
-
-%s`, issue.Reporter, issue.Content)),
+			Body:  github.String(buf.String()),
 			// TODO: labels are currently broken, I think I need to make sure they are
 			// created first.
 			// Labels: &labels,

@@ -26,7 +26,7 @@ type issue struct {
 	Status           string        `json:"status"`
 	Priority         string        `json:"priority"`
 	Kind             string        `json:"kind"`
-	ContentUpdatedOn time.Time     `json:"content_updated_on"`
+	ContentUpdatedOn *time.Time    `json:"content_updated_on"`
 	Voters           []interface{} `json:"voters"`
 	Title            string        `json:"title"`
 	Reporter         string        `json:"reporter"`
@@ -36,9 +36,9 @@ type issue struct {
 	Assignee         interface{}   `json:"assignee"`
 	CreatedOn        time.Time     `json:"created_on"`
 	Version          interface{}   `json:"version"`
-	EditedOn         interface{}   `json:"edited_on"`
+	EditedOn         *time.Time    `json:"edited_on"`
 	Milestone        interface{}   `json:"milestone"`
-	UpdatedOn        time.Time     `json:"updated_on"`
+	UpdatedOn        *time.Time    `json:"updated_on"`
 	ID               int           `json:"id"`
 }
 
