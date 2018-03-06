@@ -29,7 +29,40 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// defTmpl is the default issue template; used if none is provided by the user.
+const defTmpl = `
+	|  Metadata  | Value  |
+	| ---------- | ------ |
+	{{if .Reporter}}| Reporter   | **{{ .Reporter }}** |
+	{{end -}}
+	{{if .CreatedOn}}| Created On | **{{ .CreatedOn }}** |
+	{{end -}}
+	{{if .EditedOn}} | Edited On  | **{{ .EditedOn }}** |
+	{{end -}}
+	{{if .UpdatedOn}}| Updated On | **{{ .UpdatedOn }}** |
+	{{end -}}
+	
+	---
+	
+	{{if .Content}}{{.Content}}{{end}}`
+
 func usage(flags *flag.FlagSet, token string) {
+	t := time.Now()
+	proj := "MyProject"
+	jsonIssue, _ := json.MarshalIndent(issue{
+		Status:           "open",
+		Priority:         "high",
+		Kind:             "bug",
+		ContentUpdatedOn: &t,
+		Title:            "An issue title",
+		Reporter:         "YourUsername",
+		Component:        &proj,
+		Content:          "This is the body of the issue",
+		CreatedOn:        t,
+		EditedOn:         &t,
+		UpdatedOn:        &t,
+		ID:               123,
+	}, "\t", "  ")
 	fmt.Fprintf(flags.Output(), `Usage of %s:
 
 	issues [options] zip repo
@@ -38,13 +71,27 @@ The zip file is a Bitbucket issue export which can be obtained by visiting your
 repo's settings on Bitbucket and choosing "Import & export" from the "issues"
 section.
 
+Templates:
+
+When creating issues on GitHub, a template is used. If the user does not specify
+a template, the default template is used:
+
+%s
+
+The data provided to the template (in JSON format) is:
+
+	%s
+
+For more information see the documentation for the Go package text/template:
+https://godoc.org/text/template
+
 Environment:	
 
 	GITHUB_TOKEN=%s
 
 Options:
 
-`, os.Args[0], token)
+`, os.Args[0], defTmpl, jsonIssue, token)
 	flags.PrintDefaults()
 }
 
@@ -92,21 +139,7 @@ func main() {
 	}
 
 	if tmpl == "" {
-		tmpl = `
-|  Metadata  | Value  |
-| ---------- | ------ |
-{{if .Reporter}}| Reporter   | **{{ .Reporter }}** |
-{{end -}}
-{{if .CreatedOn}}| Created On | **{{ .CreatedOn }}** |
-{{end -}}
-{{if .EditedOn}} | Edited On  | **{{ .EditedOn }}** |
-{{end -}}
-{{if .UpdatedOn}}| Updated On | **{{ .UpdatedOn }}** |
-{{end -}}
-
----
-
-{{if .Content}}{{.Content}}{{end}}`
+		tmpl = defTmpl
 	}
 	issueTmpl := template.Must(template.New("issue").Parse(tmpl))
 
