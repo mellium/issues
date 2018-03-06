@@ -8,6 +8,33 @@ import (
 	"time"
 )
 
+type ghComment struct {
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type ghIssue struct {
+	Title     string     `json:"title"`
+	Body      string     `json:"body"`
+	CreatedAt time.Time  `json:"created_at,omitempty"`
+	ClosedAt  *time.Time `json:"closed_at,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	Closed    bool       `json:"closed"`
+	Labels    []string   `json:"labels,omitempty"`
+
+	// Assignee string `json:"assignee"`
+	// Milestone string `json:"milestone"`
+}
+
+type ghResponse struct {
+	ID        int    `json:"id"`
+	Status    string `json:"status"`
+	URL       string `json:"url"`
+	ImportURL string `json:"import_issues_url"`
+	RepoURL   string `json:"repository_url"`
+	IssueURL  string `json:"issue_url"`
+}
+
 type issues []issue
 
 func (is issues) Len() int {

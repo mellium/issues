@@ -11,12 +11,16 @@ package main // import "mellium.im/issues"
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -46,7 +50,14 @@ Options:
 	flags.PrintDefaults()
 }
 
+type dummyCloser struct{}
+
+func (dummyCloser) Close() error {
+	return nil
+}
+
 func main() {
+
 	// Setup loggers
 	logger := log.New(os.Stderr, "mellium.im/issues ", log.LstdFlags)
 	debug := log.New(ioutil.Discard, "mellium.im/issues DEBUG ", log.LstdFlags)
@@ -95,6 +106,12 @@ func main() {
 	}
 	owner := args[1][:idx]
 	repo := args[1][idx+1:]
+
+	// Parse the issues URL
+	importURL, err := url.Parse(fmt.Sprintf("https://api.github.com/repos/%s/%s/import/issues", owner, repo))
+	if err != nil {
+		logger.Panicf("Error parsing import URL: `%v'\n", err)
+	}
 
 	// Open the zip file
 	r, err := zip.OpenReader(args[0])
@@ -168,6 +185,7 @@ func main() {
 	}
 	wait(resp, debug)
 
+importloop:
 	for _, issue := range issues.Issues {
 		labels := strings.Split(labels, ",")
 		if issue.Priority != "" {
@@ -185,50 +203,102 @@ func main() {
 			labels = append(labels, issue.Status)
 		}
 
-		state := "open"
+		closed := false
 		switch strings.ToLower(issue.Status) {
 		case "resolved", "closed", "invalid", "wontfix", "duplicate":
-			state = "closed"
+			closed = true
 		case "new", "open", "on hold", "onhold":
 		default:
 			debug.Printf("Found unknown status on issue #%d: `%s'", issue.ID, issue.Status)
 		}
 
 		debug.Printf("Attempting to create issue %d\n", issue.ID)
-		req := github.IssueRequest{
-			Title: github.String(issue.Title),
-			Body: github.String(fmt.Sprintf(`by **%s**:
+		req := struct {
+			Issue    ghIssue     `json:"issue"`
+			Comments []ghComment `json:"comments"`
+		}{
+			Issue: ghIssue{
+				Title: issue.Title,
+				Body: fmt.Sprintf(`by **%s**:
 
 ---
 
-%s`, issue.Reporter, issue.Content)),
-			// TODO: labels are currently broken, I think I need to make sure they are
-			// created first.
-			// Labels: &labels,
-			State: github.String(state),
+%s`, issue.Reporter, issue.Content),
+				Labels: labels,
+				Closed: closed,
+			},
+			Comments: []ghComment{},
 		}
-		is, resp, err := client.Issues.Create(context.TODO(), owner, repo, &req)
+		reqBytes, err := json.Marshal(req)
 		if err != nil {
+			logger.Printf("Error marshaling GitHub issue %d: `%v'\n", issue.ID, err)
 			errors++
-			logger.Printf("Error creating issue %d: `%v'", issue.ID, err)
-		} else {
-			imported++
+			wait(resp, debug)
+			continue
 		}
-		wait(resp, debug)
 
-		if err == nil && state == "closed" && is.Number != nil {
-			logger.Printf("Closing issue %d…\n", issue.ID)
-			_, resp, err = client.Issues.Edit(context.TODO(), owner, repo, *is.Number, &github.IssueRequest{
-				State: github.String(state),
-			})
+		// This may break at any time.
+		// See: https://gist.github.com/jonmagic/5282384165e0f86ef105
+		result := ghResponse{}
+		resp, err = client.Do(context.TODO(), &http.Request{
+			Method: "POST",
+			URL:    importURL,
+			Header: map[string][]string{
+				"Accept": []string{"application/vnd.github.golden-comet-preview+json"},
+			},
+			Body: struct {
+				io.Reader
+				io.Closer
+			}{
+				Reader: bytes.NewReader(reqBytes),
+				Closer: dummyCloser{},
+			},
+			ContentLength: int64(len(reqBytes)),
+		}, &result)
+		switch err.(type) {
+		case *github.AcceptedError:
+			d := json.NewDecoder(resp.Body)
+			_ = d.Decode(result)
+		case nil:
+		default:
+			errors++
+			logger.Printf("Error creating issue %d: `%v'\n", issue.ID, err)
+			debug.Printf("Code: `%s'\n", resp.Status)
+			wait(resp, debug)
+			continue
+		}
+
+		debug.Printf("Status of %d: `%+v'\n", issue.ID, result)
+		panic("DONE")
+		// Poll for the issue until the import is finished.
+		issueURL, err := url.Parse(result.URL)
+		if err != nil {
+			logger.Printf("Failed to parse issue URL from GitHub, skipping import verification for issue %d: `%s'\n", issue.ID, issueURL)
+			wait(resp, debug)
+			errors++
+			continue
+		}
+		for result.Status == "pending" {
+			debug.Printf("Attempting to verify issue creation for %d…\n", issue.ID)
+			// TODO: verify that GitHub doesn't make us POST to another domain.
+			result = ghResponse{}
+			resp, err = client.Do(context.TODO(), &http.Request{
+				Method: "GET",
+				URL:    issueURL,
+				Header: map[string][]string{
+					"Accept": []string{"application/vnd.github.golden-comet-preview+json"},
+				},
+			}, &result)
 			if err != nil {
 				errors++
-				logger.Printf("Error closing issue %d: `%v'\n", issue.ID, err)
-			} else {
-				imported++
+				logger.Printf("Error creating issue %d: `%v'\n", issue.ID, err)
+				debug.Printf("Result: `%+v'\n", result)
+				wait(resp, debug)
+				continue importloop
 			}
-			wait(resp, debug)
 		}
+		imported++
+		wait(resp, debug)
 	}
 
 	s, _, _ := client.Octocat(context.TODO(), fmt.Sprintf("Imported %d, Errors %d", imported, errors))
